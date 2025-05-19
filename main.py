@@ -1,4 +1,5 @@
 import telebot
+from flask import Flask, request
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
@@ -10,6 +11,8 @@ bot_key = os.getenv("bot_key")
 
 bot = telebot.TeleBot(bot_key)
 client = OpenAI(api_key=api_key)
+
+app = Flask(__name__)
 
 system_prompt = """
 Ты — дружелюбный кулинарный ассистент. Люди пишут тебе, что у них есть в холодильнике, а ты предлагаешь несколько простых и вкусных рецепта из этих ингредиентов.
@@ -35,5 +38,19 @@ def chat_with_gpt(message):
         bot.reply_to(message, reply)
     except Exception as e:
         bot.reply_to(message, f'Произошла ошибка: {e}')
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        update = telebot.types.Update.de_json(request.stream.read().decode("utf-8"))
+        bot.process_new_updates([update])
+        return '', 200
+    return 'Invalid request', 400
+
+if __name__ == '__main__':
+    bot.remove_webhook()
+    bot.set_webhook(url='https://recipe-gpt-bot.onrender.com')
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
 
 bot.infinity_polling()
